@@ -108,7 +108,7 @@ class Request {
   }
 }
 
-const cmsRequest = new Request({ baseURL: '/cms' });
+const cmsRequest = new Request({ baseURL: 'https://www.beangotown.com/cms' });
 const tokenRequest = new Request({
   baseURL: '/connect',
 });
