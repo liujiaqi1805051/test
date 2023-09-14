@@ -50,7 +50,8 @@ export default function useWebLogin({ signHandle }: { signHandle?: any }) {
 
   const [didWalletInfo, setDidWalletInfo] = useState<PortkeyInfoType>();
 
-  const syncAddress = useRef<boolean>(false);
+  const interval = useRef<number | null>(null);
+  const isAsyncSuccess = useRef<boolean>(false);
 
   const { walletType, walletInfo } = useGetState();
 
@@ -64,19 +65,15 @@ export default function useWebLogin({ signHandle }: { signHandle?: any }) {
 
   const portKeyExtensionUrl = configInfo.configInfo!.portKeyExtensionUrl;
 
-  useIntervalAsync(async () => {
-    if (walletType !== WalletType.portkey) {
-      return;
-    }
-    if (walletInfo) {
-      return;
-    }
-    if (syncAddress.current) {
-      return;
-    }
+  useEffect(() => {
+    window.onbeforeunload = window.onunload = () => {
+      interval.current && window.clearInterval(interval.current);
+    };
+  }, []);
+
+  const getAsyncAccount = useCallback(async () => {
     showMessage.loading('Syncing on-chain account info');
     const wallet = await InstanceProvider.getWalletInstance();
-
     if (!wallet?.portkeyInfo) {
       return;
     }
@@ -98,13 +95,24 @@ export default function useWebLogin({ signHandle }: { signHandle?: any }) {
             },
           }),
         );
-
-        syncAddress.current = true;
+        isAsyncSuccess.current = true;
+        interval.current && window.clearInterval(interval.current);
       }
     } catch (err) {
       console.log(err);
     }
-  }, 5000);
+  }, [curChain]);
+
+  const asyncAccountInfo = useCallback(async () => {
+    await getAsyncAccount();
+    interval.current = window.setInterval(async () => {
+      if (isAsyncSuccess.current) {
+        interval.current && window.clearInterval(interval.current);
+        return;
+      }
+      getAsyncAccount();
+    }, 5000);
+  }, [getAsyncAccount]);
 
   const detect = useCallback(async (): Promise<IPortkeyProvider> => {
     if (discoverProvider?.isConnected()) {
@@ -276,7 +284,7 @@ export default function useWebLogin({ signHandle }: { signHandle?: any }) {
     } catch (err) {
       console.error('GetGameLimitSettingsErr:', err);
     }
-  }, [walletInfo, walletType]);
+  }, [configInfo, curChain, updatePlayerInformation, walletInfo, walletType]);
 
   const onAccountsSuccess = useCallback(async (provider: IPortkeyProvider, accounts: AccountsType) => {
     let nickName = 'Wallet 01';
@@ -327,6 +335,7 @@ export default function useWebLogin({ signHandle }: { signHandle?: any }) {
         InstanceProvider.setWalletInfoInstance({
           portkeyInfo: walletInfo as PortkeyInfoType,
         });
+        asyncAccountInfo();
       } else {
         store.dispatch(
           setWalletInfo({

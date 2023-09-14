@@ -385,10 +385,10 @@ export default function Game() {
   };
 
   useEffect(() => {
-    if (address) {
+    if (address && isLogin) {
       initCheckBeanPass();
     }
-  }, [address]);
+  }, [address, initCheckBeanPass, isLogin]);
 
   useEffect(() => {
     if (!isLogin) {
